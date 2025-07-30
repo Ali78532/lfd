@@ -87,7 +87,7 @@ function playAudio(filename) {
 
   // العثور على الأيقونة المطابقة
   const selector = `.audio-icon[onclick="playAudio('${filename}')"]`;
-  const elem = document.querySelector(selector);
+  const elem     = document.querySelector(selector);
   if (!elem) {
     console.warn('لم أجد أيقونة للصوت لملف:', filename);
     return;
@@ -108,10 +108,14 @@ function playAudio(filename) {
   }, 500);
   loadingTimers.set(elem, timer);
 
-  // إنشاء أو استرجاع الصوت من الكاش
-  currentAudio = audioCache[filename]
-    ? audioCache[filename]
-    : new Audio(`${currentTopic}/${filename}`);
+  // **** هنا نستخدم المسار المفتاحي بدل الاسم فقط ****
+  const key = `${currentTopic}/${filename}`;
+  if (audioCache[key]) {
+    currentAudio = audioCache[key];
+  } else {
+    currentAudio = new Audio(key);
+    audioCache[key] = currentAudio;
+  }
 
   // عند بدء التشغيل (حتى من الكاش)
   currentAudio.addEventListener('playing', () => {
@@ -131,18 +135,17 @@ function playAudio(filename) {
 async function preloadSequentialAudio(sessionToken) {
   const icons = contentEl.querySelectorAll('.audio-icon');
   for (const icon of icons) {
-    // إذا خرج المستخدم من الجلسة، توقف
     if (sessionToken !== preloadSessionToken) return;
 
     const onclick = icon.getAttribute('onclick') || '';
-    const match = onclick.match(/playAudio\('(.+?)'\)/);
-    if (!match) continue;
-    const filename = match[1];
+    const m = onclick.match(/playAudio\('(.+?)'\)/);
+    if (!m) continue;
+    const filename = m[1];
 
-    if (!audioCache[filename]) {
-      const audio = new Audio(`${currentTopic}/${filename}`);
+    const key = `${currentTopic}/${filename}`;
+    if (!audioCache[key]) {
+      const audio = new Audio(key);
       audio.preload = 'auto';
-      // انتظر حتى يتحمَّل بما يكفي
       await new Promise(resolve => {
         const onCan = () => {
           audio.removeEventListener('canplaythrough', onCan);
@@ -151,9 +154,8 @@ async function preloadSequentialAudio(sessionToken) {
         audio.addEventListener('canplaythrough', onCan);
         audio.load();
       });
-      // إذا غادر المستخدم الجلسة فلن نضيف للكاش
       if (sessionToken !== preloadSessionToken) return;
-      audioCache[filename] = audio;
+      audioCache[key] = audio;
     }
   }
 }
